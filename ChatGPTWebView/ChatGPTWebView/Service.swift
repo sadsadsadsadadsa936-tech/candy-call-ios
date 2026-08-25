@@ -9,20 +9,38 @@ struct InjectedJavaScript {
 enum Service: CaseIterable {
     case candyCall
 
-    var homeURL: URL {
-        URL(string: "https://candy-hosting.com/candy-call/")!
+    /// Local bundled UI (no Cloudflare website).
+    var localIndexURL: URL? {
+        Bundle.main.url(forResource: "index", withExtension: "html", subdirectory: "www")
+            ?? Bundle.main.url(forResource: "index", withExtension: "html")
     }
+
+    var homeURL: URL {
+        localIndexURL ?? URL(string: "https://candy-hosting.com/candy-call/")!
+    }
+
+    var usesLocalBundle: Bool { localIndexURL != nil }
 
     var title: String { "Candy Call" }
 
     var tabIconSystemName: String { "phone.fill" }
 
     var userAgentOverride: String? {
-        // Mobile Safari UA so WebRTC / getUserMedia behave like Safari
         "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
     }
 
-    var injectedJavaScript: InjectedJavaScript? { nil }
+    var injectedJavaScript: InjectedJavaScript? {
+        InjectedJavaScript(
+            documentStart: """
+            window.CANDY_CALL_CONFIG = {
+              apiBase: 'https://candy-hosting.com',
+              native: true
+            };
+            """,
+            documentEnd: nil,
+            didFinish: nil
+        )
+    }
 
     var zoomDefaultsKey: String { "zoomScale.candyCall" }
 

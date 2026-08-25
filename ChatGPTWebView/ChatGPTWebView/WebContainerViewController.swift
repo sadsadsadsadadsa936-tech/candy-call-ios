@@ -1,7 +1,10 @@
 import UIKit
 import WebKit
+import AVFoundation
+import UserNotifications
+import AudioToolbox
 
-final class WebContainerViewController: UIViewController, WKNavigationDelegate, WKUIDelegate {
+final class WebContainerViewController: UIViewController, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler {
     static let sharedProcessPool = WKProcessPool()
 
     private(set) var webView: WKWebView?
@@ -9,6 +12,7 @@ final class WebContainerViewController: UIViewController, WKNavigationDelegate, 
     private let service: Service
     private var lastKnownURL: URL?
     private var memoryWarningObserver: NSObjectProtocol?
+    private var ringPlayer: AVAudioPlayer?
     private lazy var menuBarButtonItem = UIBarButtonItem(
         title: "⋯",
         style: .plain,
@@ -94,6 +98,10 @@ final class WebContainerViewController: UIViewController, WKNavigationDelegate, 
     }
 
     private func configureNavigationItems() {
+        if service.usesLocalBundle {
+            navigationItem.rightBarButtonItems = []
+            return
+        }
         let safariButton = UIBarButtonItem(
             image: UIImage(systemName: "safari"),
             style: .plain,
@@ -117,9 +125,9 @@ final class WebContainerViewController: UIViewController, WKNavigationDelegate, 
         newWebView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         newWebView.navigationDelegate = self
         newWebView.uiDelegate = self
-        newWebView.allowsBackForwardNavigationGestures = true
-        newWebView.backgroundColor = .systemBackground
-        newWebView.isOpaque = false
+        newWebView.allowsBackForwardNavigationGestures = !service.usesLocalBundle
+        newWebView.backgroundColor = UIColor(red: 0.04, green: 0.07, blue: 0.12, alpha: 1)
+        newWebView.isOpaque = true
         view.insertSubview(newWebView, belowSubview: activityIndicator)
         webView = newWebView
         loadLastURLIfNeeded()
@@ -132,6 +140,9 @@ final class WebContainerViewController: UIViewController, WKNavigationDelegate, 
         config.allowsInlineMediaPlayback = true
         config.mediaTypesRequiringUserActionForPlayback = []
         config.suppressesIncrementalRendering = false
+        if #available(iOS 14.0, *) {
+            config.defaultWebpagePreferences.allowsContentJavaScript = true
+        }
 
         let prefs = WKWebpagePreferences()
         prefs.allowsContentJavaScript = true
@@ -139,6 +150,7 @@ final class WebContainerViewController: UIViewController, WKNavigationDelegate, 
         config.defaultWebpagePreferences = prefs
 
         let userContentController = WKUserContentController()
+        userContentController.add(self, name: "candyNative")
         if let injectedJavaScript = service.injectedJavaScript {
             if let documentStart = injectedJavaScript.documentStart {
                 let script = WKUserScript(source: documentStart, injectionTime: .atDocumentStart, forMainFrameOnly: true)
@@ -158,10 +170,43 @@ final class WebContainerViewController: UIViewController, WKNavigationDelegate, 
         guard let webView else { return }
         guard webView.url == nil else { return }
         activityIndicator.startAnimating()
+
+        if let local = service.localIndexURL {
+            let readAccess = local.deletingLastPathComponent()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                webView.loadFileURL(local, allowingReadAccessTo: readAccess)
+            }
+            return
+        }
+
         let destination = lastKnownURL ?? service.homeURL
         let request = URLRequest(url: destination, cachePolicy: .reloadRevalidatingCacheData, timeoutInterval: 30)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
             webView.load(request)
+        }
+    }
+
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard message.name == "candyNative" else { return }
+        guard let body = message.body as? [String: Any], let type = body["type"] as? String else { return }
+        switch type {
+        case "request_permissions":
+            UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
+            AVAudioSession.sharedInstance().requestRecordPermission { _ in }
+        case "incoming", "ring_pulse":
+            AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)
+            let title = (body["title"] as? String) ?? "Candy Call"
+            let text = (body["body"] as? String) ?? "Eingehender Anruf"
+            let content = UNMutableNotificationContent()
+            content.title = title
+            content.body = text
+            content.sound = .default
+            let req = UNNotificationRequest(identifier: "candy-call-ring", content: content, trigger: nil)
+            UNUserNotificationCenter.current().add(req, withCompletionHandler: nil)
+        case "stop_ring":
+            UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: ["candy-call-ring"])
+        default:
+            break
         }
     }
 

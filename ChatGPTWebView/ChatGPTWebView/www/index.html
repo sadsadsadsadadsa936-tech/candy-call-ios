@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+  <meta name="theme-color" content="#22c55e">
+  <title>Candy Call</title>
+  <script>
+    window.CANDY_CALL_CONFIG = {
+      apiBase: 'https://candy-hosting.com',
+      native: true
+    };
+  </script>
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <div id="login-view" class="view">
+    <div class="card login-card">
+      <div class="mark">Candy Call</div>
+      <h1>Anmelden</h1>
+      <p class="sub">Passwort eingeben. Danach bleibst du eingeloggt, bis du dich ausloggst.</p>
+      <label>Passwort</label>
+      <input id="login-pass" type="password" inputmode="numeric" autocomplete="current-password" placeholder="••••••">
+      <div class="err" id="login-err"></div>
+      <button class="btn primary" id="login-btn" type="button">Weiter</button>
+    </div>
+  </div>
+
+  <div id="app-view" class="view hidden">
+    <header class="top">
+      <div>
+        <div class="brand">Candy Call</div>
+        <div class="who" id="who">–</div>
+      </div>
+      <button class="chip" id="logout-btn" type="button">Logout</button>
+    </header>
+
+    <nav class="tabs">
+      <button class="tab active" data-tab="calls" type="button">Anrufe</button>
+      <button class="tab" data-tab="history" type="button">History</button>
+      <button class="tab master-only hidden" data-tab="accounts" type="button">Accounts</button>
+    </nav>
+
+    <section id="tab-calls" class="panel">
+      <div class="status-line" id="agent-status">Verbinde…</div>
+      <div id="incoming" class="incoming hidden">
+        <div class="ring-dot"></div>
+        <h2 id="inc-name">Anrufer</h2>
+        <p id="inc-email">email</p>
+        <p class="sub" id="inc-extra"></p>
+        <div class="row">
+          <button class="btn danger" id="btn-reject" type="button">Ablehnen</button>
+          <button class="btn primary" id="btn-accept" type="button">Annehmen</button>
+        </div>
+      </div>
+      <div id="active-call" class="active-call hidden">
+        <h2 id="act-name">Gespräch</h2>
+        <p id="act-email"></p>
+        <p class="sub" id="act-state">Aktiv</p>
+        <div class="call-actions">
+          <button class="btn" id="btn-hold" type="button">Warteschlange</button>
+          <button class="btn" id="btn-transfer" type="button">Weiterleiten</button>
+          <button class="btn danger" id="btn-hangup" type="button">Auflegen</button>
+        </div>
+        <div id="transfer-box" class="transfer-box hidden">
+          <p class="sub">An wen weiterleiten?</p>
+          <div id="transfer-list"></div>
+        </div>
+      </div>
+      <p class="sub idle" id="idle-hint">Keine aktiven Anrufe. App offen lassen, um Anrufe zu empfangen.</p>
+    </section>
+
+    <section id="tab-history" class="panel hidden">
+      <div id="history-list" class="list"></div>
+    </section>
+
+    <section id="tab-accounts" class="panel hidden">
+      <div class="card">
+        <h3>Account erstellen</h3>
+        <label>Anzeigename</label>
+        <input id="acc-name" maxlength="48" placeholder="z.B. Support Lisa">
+        <label>Passwort</label>
+        <input id="acc-pass" maxlength="64" placeholder="Passwort für den Account">
+        <div class="err" id="acc-err"></div>
+        <button class="btn primary" id="acc-create" type="button">Erstellen</button>
+      </div>
+      <div id="accounts-list" class="list"></div>
+    </section>
+  </div>
+
+  <audio id="ring-audio" loop preload="auto"></audio>
+  <audio id="remote-audio" autoplay playsinline webkit-playsinline></audio>
+  <script src="app.js"></script>
+</body>
+</html>

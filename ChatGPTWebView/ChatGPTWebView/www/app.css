@@ -1,0 +1,158 @@
+:root {
+  --bg: #07090d;
+  --card: #121821;
+  --line: rgba(255,255,255,.1);
+  --text: #eef3f8;
+  --muted: rgba(238,243,248,.55);
+  --green: #22c55e;
+  --red: #ef4444;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Instrument Sans", system-ui, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+body {
+  padding: env(safe-area-inset-top) 16px calc(18px + env(safe-area-inset-bottom));
+  background:
+    radial-gradient(600px 320px at 80% -10%, rgba(34,197,94,.16), transparent 55%),
+    var(--bg);
+}
+.hidden { display: none !important; }
+.view { min-height: 100vh; }
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 18px;
+  margin-bottom: 14px;
+}
+.login-card {
+  max-width: 420px;
+  margin: 12vh auto 0;
+}
+.mark {
+  color: var(--green);
+  font-size: 12px;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+h1 { font-size: 28px; letter-spacing: -.03em; margin-bottom: 8px; }
+h2 { font-size: 22px; margin: 8px 0; }
+h3 { font-size: 16px; margin-bottom: 12px; }
+.sub, .hint, .idle { color: var(--muted); font-size: 13px; line-height: 1.45; }
+.hint { margin-top: 14px; }
+label {
+  display: block;
+  font-size: 11px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 12px 0 6px;
+}
+input {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: rgba(0,0,0,.35);
+  color: #fff;
+  border-radius: 12px;
+  padding: 13px 14px;
+  font: 500 16px/1.3 "Instrument Sans", system-ui, sans-serif;
+  outline: none;
+}
+input:focus { border-color: rgba(34,197,94,.5); }
+.err { min-height: 18px; color: #fb7185; font-size: 13px; margin: 8px 0; }
+.btn {
+  border: 0;
+  border-radius: 12px;
+  padding: 13px 14px;
+  font: 600 14px/1 "Instrument Sans", system-ui, sans-serif;
+  cursor: pointer;
+  background: rgba(255,255,255,.08);
+  color: #fff;
+  width: 100%;
+  margin-top: 10px;
+}
+.btn.primary { background: var(--green); color: #04140a; }
+.btn.danger { background: var(--red); color: #fff; }
+.chip {
+  border: 1px solid var(--line);
+  background: rgba(0,0,0,.25);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0 14px;
+}
+.brand { font-weight: 700; font-size: 18px; }
+.who { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.tabs { display: flex; gap: 8px; margin-bottom: 14px; }
+.tab {
+  flex: 1;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+  border-radius: 12px;
+  padding: 10px;
+  font: 600 13px/1 "Instrument Sans", system-ui, sans-serif;
+  cursor: pointer;
+}
+.tab.active {
+  color: #04140a;
+  background: var(--green);
+  border-color: var(--green);
+}
+.status-line { font-size: 13px; color: var(--muted); margin-bottom: 12px; }
+.incoming, .active-call {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 20px 16px;
+  text-align: center;
+}
+.ring-dot {
+  width: 64px; height: 64px;
+  margin: 0 auto 12px;
+  border-radius: 50%;
+  background: var(--green);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(34,197,94,.5); }
+  50% { box-shadow: 0 0 0 16px rgba(34,197,94,0); }
+}
+.row { display: flex; gap: 10px; margin-top: 16px; }
+.row .btn { margin-top: 0; }
+.call-actions { display: grid; gap: 8px; margin-top: 16px; }
+.transfer-box { margin-top: 12px; text-align: left; }
+.list { display: grid; gap: 10px; }
+.item {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px 14px;
+}
+.item strong { display: block; margin-bottom: 4px; }
+.item .meta { color: var(--muted); font-size: 12px; line-height: 1.4; }
+.item .row { margin-top: 10px; }
+.pass-pill {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: rgba(34,197,94,.12);
+  color: var(--green);
+  font-size: 12px;
+  font-family: ui-monospace, monospace;
+}
