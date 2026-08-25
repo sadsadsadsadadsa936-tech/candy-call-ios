@@ -1,0 +1,46 @@
+{
+  "name": "Candy Hosting",
+  "subtitle": "Candy Call Support App",
+  "description": "Offizielle Candy Call App fuer Support-Anrufe. Installiere ueber AltStore oder SideStore.",
+  "iconURL": "https://raw.githubusercontent.com/sadsadsadsadadsa936-tech/candy-call-ios/main/icon-192.png",
+  "headerURL": "https://raw.githubusercontent.com/sadsadsadsadadsa936-tech/candy-call-ios/main/icon-512.png",
+  "website": "https://candy-hosting.com",
+  "tintColor": "#22c55e",
+  "featuredApps": [
+    "com.candyhosting.call"
+  ],
+  "apps": [
+    {
+      "name": "Candy Call",
+      "bundleIdentifier": "com.candyhosting.call",
+      "developerName": "Candy Hosting",
+      "subtitle": "Support-Telefon fuer candy-hosting.com",
+      "version": "1.0.0",
+      "versionDate": "2026-08-25T15:41:00Z",
+      "versionDescription": "Erste AltStore-Version.",
+      "downloadURL": "https://github.com/sadsadsadsadadsa936-tech/candy-call-ios/releases/download/v1.0.0/CandyCall.ipa",
+      "localizedDescription": "Native iPhone-App fuer Candy Call.\\n\\n- Master-Login\\n- Anrufe annehmen / ablehnen\\n- Warteschlange und Weiterleiten\\n- Echtes Mikrofon-Audio\\n\\nNach dem Login bleibst du eingeloggt bis zum Logout.",
+      "iconURL": "https://raw.githubusercontent.com/sadsadsadsadadsa936-tech/candy-call-ios/main/icon-192.png",
+      "tintColor": "22c55e",
+      "size": 104691,
+      "versions": [
+        {
+          "version": "1.0.0",
+          "buildVersion": "1",
+          "date": "2026-08-25T15:41:00Z",
+          "localizedDescription": "Erste AltStore-Version - Candy Call Native Shell.",
+          "downloadURL": "https://github.com/sadsadsadsadadsa936-tech/candy-call-ios/releases/download/v1.0.0/CandyCall.ipa",
+          "size": 104691,
+          "minOSVersion": "15.0"
+        }
+      ],
+      "permissions": [
+        {
+          "type": "microphone",
+          "usageDescription": "Candy Call braucht das Mikrofon fuer Telefongespraeche mit Kunden."
+        }
+      ]
+    }
+  ],
+  "news": []
+}
