@@ -1,7 +1,7 @@
 {
   "name": "Candy Hosting",
-  "subtitle": "Candy Call Support App",
-  "description": "Offizielle Candy Call App fuer Support-Anrufe. Installiere ueber AltStore oder SideStore.",
+  "subtitle": "Sideload via SideStore (nicht AltStore PAL)",
+  "description": "Candy Call Sideload-App. Funktioniert mit SideStore / AltStore Classic / Sideloadly. NICHT mit AltStore PAL (EU Marketplace braucht Notarisierung).",
   "iconURL": "https://raw.githubusercontent.com/sadsadsadsadadsa936-tech/candy-call-ios/main/icon-192.png",
   "headerURL": "https://raw.githubusercontent.com/sadsadsadsadadsa936-tech/candy-call-ios/main/icon-512.png",
   "website": "https://candy-hosting.com",
