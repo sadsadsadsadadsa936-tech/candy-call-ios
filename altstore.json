@@ -1,36 +1,34 @@
 {
   "name": "Candy Hosting",
   "subtitle": "Candy Call Native App",
-  "description": "Candy Call Sideload-App (v1.1). SideStore / Sideloadly / AltStore Classic. Nicht AltStore PAL.",
+  "description": "Candy Call Sideload-App (v1.2). SideStore / Sideloadly / AltStore Classic. Nicht AltStore PAL.",
   "iconURL": "https://raw.githubusercontent.com/sadsadsadsadadsa936-tech/candy-call-ios/main/icon-192.png",
   "headerURL": "https://raw.githubusercontent.com/sadsadsadsadadsa936-tech/candy-call-ios/main/icon-512.png",
   "website": "https://candy-hosting.com",
   "tintColor": "#22c55e",
-  "featuredApps": [
-    "com.candyhosting.call"
-  ],
+  "featuredApps": ["com.candyhosting.call"],
   "apps": [
     {
       "name": "Candy Call",
       "bundleIdentifier": "com.candyhosting.call",
       "developerName": "Candy Hosting",
       "subtitle": "Support-Telefon native",
-      "version": "1.1.0",
-      "versionDate": "2026-08-25T17:50:00Z",
-      "versionDescription": "Lokale App-UI, Audio-Fix, Hold-Fix, Klingeln/Benachrichtigung.",
-      "downloadURL": "https://github.com/sadsadsadsadadsa936-tech/candy-call-ios/releases/download/v1.1.0/CandyCall.ipa",
-      "localizedDescription": "Native Candy Call App ohne Cloudflare-Website.\\n\\nAudio, Warteschlange, History, Accounts.",
+      "version": "1.2.0",
+      "versionDate": "2026-08-25T18:10:00Z",
+      "versionDescription": "Login-Fix (Cloudflare Bypass), Safe-Area.",
+      "downloadURL": "https://github.com/sadsadsadsadadsa936-tech/candy-call-ios/releases/download/v1.2.0/CandyCall.ipa",
+      "localizedDescription": "Native Candy Call App. Login funktioniert wieder.",
       "iconURL": "https://raw.githubusercontent.com/sadsadsadsadadsa936-tech/candy-call-ios/main/icon-192.png",
       "tintColor": "22c55e",
-      "size": 137480,
+      "size": 137894,
       "versions": [
         {
-          "version": "1.1.0",
-          "buildVersion": "2",
-          "date": "2026-08-25T17:50:00Z",
-          "localizedDescription": "Lokale UI, Audio + Hold Fixes, native Ring-Notifications.",
-          "downloadURL": "https://github.com/sadsadsadsadadsa936-tech/candy-call-ios/releases/download/v1.1.0/CandyCall.ipa",
-          "size": 137480,
+          "version": "1.2.0",
+          "buildVersion": "3",
+          "date": "2026-08-25T18:10:00Z",
+          "localizedDescription": "Login funktioniert wieder (Direkt-API), kein schwarzer Balken.",
+          "downloadURL": "https://github.com/sadsadsadsadadsa936-tech/candy-call-ios/releases/download/v1.2.0/CandyCall.ipa",
+          "size": 137894,
           "minOSVersion": "15.0"
         }
       ],
@@ -43,4 +41,4 @@
     }
   ],
   "news": []
-}\n
+}
