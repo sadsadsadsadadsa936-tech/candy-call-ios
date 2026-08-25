@@ -1,0 +1,109 @@
+name: Build Unsigned IPA
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  build:
+    runs-on: macos-15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Create Python virtual environment
+        env:
+          PIP_BREAK_SYSTEM_PACKAGES: 1
+        run: |
+          python3 -m venv --upgrade-deps .venv
+          .venv/bin/python -m pip install --upgrade pip --break-system-packages
+          .venv/bin/python -m pip install pillow --break-system-packages
+
+      - name: Generate app icons
+        run: .venv/bin/python scripts/generate_app_icons.py
+
+      - name: Cache derived data
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/DerivedData
+          key: derived-${{ runner.os }}-${{ hashFiles('ChatGPTWebView/ChatGPTWebView.xcodeproj/project.pbxproj') }}
+          restore-keys: |
+            derived-${{ runner.os }}-
+
+      - name: Build (no signing)
+        working-directory: ChatGPTWebView
+        run: |
+          set -euo pipefail
+
+          SCHEME="ChatGPTWebView"
+          PROJECT="ChatGPTWebView.xcodeproj"
+          DERIVED="$RUNNER_TEMP/DerivedData"
+
+          xcodebuild \
+            -project "$PROJECT" \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination "generic/platform=iOS" \
+            -derivedDataPath "$DERIVED" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
+            build
+
+          APP_PATH=$(find "$DERIVED/Build/Products/Release-iphoneos" -maxdepth 1 -name "*.app" -print -quit)
+          if [ -z "${APP_PATH:-}" ]; then
+            echo "No .app found in build products"
+            ls -la "$DERIVED/Build/Products/Release-iphoneos" || true
+            exit 1
+          fi
+
+          echo "Built app: $APP_PATH"
+
+          # Ensure display metadata
+          /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName Candy Call" "$APP_PATH/Info.plist" || true
+          /usr/libexec/PlistBuddy -c "Set :CFBundleName Candy Call" "$APP_PATH/Info.plist" || true
+
+          OUT_DIR="$RUNNER_TEMP/out"
+          mkdir -p "$OUT_DIR/Payload"
+          cp -R "$APP_PATH" "$OUT_DIR/Payload/"
+
+          rm -rf "$OUT_DIR/Payload/"*.app/_CodeSignature || true
+          rm -f "$OUT_DIR/Payload/"*.app/embedded.mobileprovision || true
+
+          (cd "$OUT_DIR" && /usr/bin/zip -qry "CandyCall.ipa" Payload)
+
+          ls -la "$OUT_DIR"
+          echo "IPA_SIZE=$(stat -f%z "$OUT_DIR/CandyCall.ipa")" >> "$GITHUB_ENV"
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CandyCall-ipa
+          path: ${{ runner.temp }}/out/CandyCall.ipa
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.0
+          name: Candy Call 1.0.0
+          body: |
+            Unsigned IPA for AltStore / SideStore / Sideloadly.
+            Bundle ID: `com.candyhosting.call`
+            Opens https://candy-hosting.com/candy-call/
+          files: ${{ runner.temp }}/out/CandyCall.ipa
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
