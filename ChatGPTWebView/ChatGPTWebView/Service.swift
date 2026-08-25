@@ -33,7 +33,7 @@ enum Service: CaseIterable {
         InjectedJavaScript(
             documentStart: """
             window.CANDY_CALL_CONFIG = {
-              apiBase: 'https://candy-hosting.com',
+              apiBase: 'http://5.175.192.242:3855',
               native: true
             };
             """,

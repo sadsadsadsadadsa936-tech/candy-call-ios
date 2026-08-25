@@ -115,27 +115,61 @@
   }
 
   async function api(path, body) {
-    const res = await fetch(apiUrl(path), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: 'Bearer ' + token } : {})
-      },
-      body: JSON.stringify(body || {})
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
-    return data;
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 20000);
+    try {
+      const res = await fetch(apiUrl(path), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: 'Bearer ' + token } : {})
+        },
+        body: JSON.stringify(body || {}),
+        signal: ctrl.signal
+      });
+      const text = await res.text();
+      if (/^\s*</.test(text)) {
+        throw new Error('Server blockiert die App (Cloudflare). Bitte Candy Call v1.2 installieren.');
+      }
+      let data = {};
+      try { data = JSON.parse(text); } catch {
+        throw new Error('Ungültige Server-Antwort (' + res.status + ')');
+      }
+      if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+      return data;
+    } catch (e) {
+      if (e.name === 'AbortError') throw new Error('Zeitüberschreitung – Server nicht erreichbar');
+      throw e;
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   async function apiGet(path) {
-    const res = await fetch(apiUrl(path), {
-      headers: token ? { Authorization: 'Bearer ' + token } : {},
-      cache: 'no-store'
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
-    return data;
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 20000);
+    try {
+      const res = await fetch(apiUrl(path), {
+        headers: token ? { Authorization: 'Bearer ' + token } : {},
+        cache: 'no-store',
+        signal: ctrl.signal
+      });
+      const text = await res.text();
+      if (/^\s*</.test(text)) {
+        throw new Error('Server blockiert die App (Cloudflare). Bitte Candy Call v1.2 installieren.');
+      }
+      let data = {};
+      try { data = JSON.parse(text); } catch {
+        throw new Error('Ungültige Server-Antwort (' + res.status + ')');
+      }
+      if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+      return data;
+    } catch (e) {
+      if (e.name === 'AbortError') throw new Error('Zeitüberschreitung – Server nicht erreichbar');
+      throw e;
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   function showLogin() {
@@ -501,8 +535,13 @@
 
   $('login-btn').onclick = async () => {
     $('login-err').textContent = '';
+    $('login-btn').disabled = true;
+    $('login-btn').textContent = 'Bitte warten…';
     try {
-      await unlockAudio();
+      await Promise.race([
+        unlockAudio(),
+        new Promise((r) => setTimeout(r, 600))
+      ]);
       const data = await api('/api/candy-call/login', { password: $('login-pass').value });
       token = data.token;
       me = data.account;
@@ -510,12 +549,19 @@
       showApp();
       connectWs();
       try {
-        await ensureMic();
-        if (Notification.permission === 'default') Notification.requestPermission().catch(() => {});
+        ensureMic().catch(() => {});
+        try {
+          if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+            Notification.requestPermission().catch(() => {});
+          }
+        } catch (_) { /* ignore */ }
         nativeBridge({ type: 'request_permissions' });
       } catch (_) { /* ask again on call */ }
     } catch (e) {
       $('login-err').textContent = e.message || 'Login fehlgeschlagen';
+    } finally {
+      $('login-btn').disabled = false;
+      $('login-btn').textContent = 'Weiter';
     }
   };
   $('login-pass').addEventListener('keydown', (e) => {

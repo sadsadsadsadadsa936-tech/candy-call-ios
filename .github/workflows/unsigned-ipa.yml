@@ -97,12 +97,13 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.1.0
-          name: Candy Call 1.1.0
+          tag_name: v1.2.0
+          name: Candy Call 1.2.0
           body: |
             Unsigned IPA for AltStore / SideStore / Sideloadly.
             Bundle ID: `com.candyhosting.call`
-            Opens https://candy-hosting.com/candy-call/
+            Connects directly to call API (bypasses Cloudflare).
+            Fixes login + safe-area layout.
           files: ${{ runner.temp }}/out/CandyCall.ipa
           fail_on_unmatched_files: true
         env:

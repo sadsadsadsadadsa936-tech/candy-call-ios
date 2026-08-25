@@ -128,6 +128,12 @@ final class WebContainerViewController: UIViewController, WKNavigationDelegate, 
         newWebView.allowsBackForwardNavigationGestures = !service.usesLocalBundle
         newWebView.backgroundColor = UIColor(red: 0.04, green: 0.07, blue: 0.12, alpha: 1)
         newWebView.isOpaque = true
+        newWebView.scrollView.contentInsetAdjustmentBehavior = .never
+        newWebView.scrollView.contentInset = .zero
+        newWebView.scrollView.scrollIndicatorInsets = .zero
+        if #available(iOS 11.0, *) {
+            newWebView.scrollView.contentInsetAdjustmentBehavior = .never
+        }
         view.insertSubview(newWebView, belowSubview: activityIndicator)
         webView = newWebView
         loadLastURLIfNeeded()
