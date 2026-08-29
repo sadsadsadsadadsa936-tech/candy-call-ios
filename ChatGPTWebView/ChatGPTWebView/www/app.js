@@ -53,10 +53,36 @@
     return API_BASE + path;
   }
 
+  const PCM = window.CandyPcmAudio;
+  if (CFG.native && PCM) {
+    PCM.setNativePlay((b64, sr) => nativeBridge({ type: 'play_pcm', d: b64, sr }));
+  }
+
   function nativeBridge(payload) {
     try {
       window.webkit?.messageHandlers?.candyNative?.postMessage(payload);
     } catch (_) { /* ignore */ }
+  }
+
+  function stopPcmCall() {
+    PCM?.stopAll();
+    nativeBridge({ type: 'stop_pcm' });
+  }
+
+  async function startPcmCall() {
+    if (!PCM || !localStream || !ws || !activeCallId || onHold) return;
+    nativeBridge({ type: 'speaker_on' });
+    nativeBridge({ type: 'pcm_start' });
+    await PCM.startCapture(localStream, (pcm) => {
+      if (onHold || !ws || ws.readyState !== 1 || !activeCallId) return;
+      ws.send(JSON.stringify({
+        type: 'audio_pcm',
+        callId: activeCallId,
+        sr: PCM.SR,
+        d: PCM.b64enc(new Uint8Array(pcm.buffer, pcm.byteOffset, pcm.byteLength))
+      }));
+    });
+    if ($('act-state')) $('act-state').textContent = 'Verbunden – Live-Audio aktiv';
   }
 
   async function unlockAudio() {
@@ -294,6 +320,7 @@
 
   function cleanupPc(keepMic) {
     stopReceiverWatch();
+    stopPcmCall();
     attachedRemoteTrackId = null;
     try { pc?.close(); } catch (_) {}
     pc = null;
@@ -501,13 +528,14 @@
         try {
           await unlockAudio();
           await ensureMic();
-          // PeerConnection wird erstellt wenn das Offer vom Anrufer ankommt
+          await startPcmCall();
         } catch (e) {
           $('act-state').textContent = 'Mikrofon-Fehler: ' + (e.message || e);
         }
       }
       if (msg.type === 'call_hold') {
         onHold = true;
+        PCM?.stopCapture();
         $('act-state').textContent = 'Warteschlange aktiv – Anrufer hört Musik';
         $('btn-hold').textContent = 'Warteschlange beenden';
         setMicEnabled(false);
@@ -518,9 +546,11 @@
         $('btn-hold').textContent = 'Warteschlange';
         setMicEnabled(true);
         nativeBridge({ type: 'speaker_on' });
-        const resumeStream = remoteVideo?.srcObject || remoteAudio?.srcObject || findRemoteAudioStream();
-        if (resumeStream) attachRemoteStream(resumeStream);
-        else startReceiverWatch();
+        await startPcmCall();
+      }
+      if (msg.type === 'audio_pcm' && msg.d && activeCallId && !onHold) {
+        if (CFG.native) nativeBridge({ type: 'play_pcm', d: msg.d, sr: msg.sr || 16000 });
+        else PCM?.handleIncoming(msg.d);
       }
       if (msg.type === 'call_transferred_away') {
         activeCallId = null;
@@ -685,17 +715,23 @@
     t.onclick = () => switchTab(t.dataset.tab);
   });
 
-  $('btn-accept').onclick = async () => {
-    try {
-      await unlockAudio();
-      await ensureMic();
-    } catch (e) {
-      alert('Mikrofon-Zugriff nötig: ' + (e.message || e));
-      return;
-    }
-    nativeBridge({ type: 'speaker_on' });
+  $('btn-accept').onclick = () => {
+    if (!incomingCallId) return;
+    const callId = incomingCallId;
     stopRing();
-    ws?.send(JSON.stringify({ type: 'accept_call', token, callId: incomingCallId }));
+    nativeBridge({ type: 'speaker_on' });
+    const micPromise = navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
+      video: false
+    });
+    micPromise.then(async (stream) => {
+      if (localStream) localStream.getTracks().forEach((t) => t.stop());
+      localStream = stream;
+      await unlockAudio();
+      ws?.send(JSON.stringify({ type: 'accept_call', token, callId }));
+    }).catch((e) => {
+      alert('Mikrofon nötig: ' + (e.message || 'Bitte in iOS-Einstellungen erlauben'));
+    });
   };
   $('btn-reject').onclick = () => {
     stopRing();

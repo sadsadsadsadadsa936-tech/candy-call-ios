@@ -4,6 +4,53 @@ import AVFoundation
 import UserNotifications
 import AudioToolbox
 
+final class NativePcmPlayer {
+    static let shared = NativePcmPlayer()
+    private let engine = AVAudioEngine()
+    private let playerNode = AVAudioPlayerNode()
+    private var format: AVAudioFormat?
+    private var started = false
+
+    func prepare(sampleRate: Double = 16000) {
+        guard !started else { return }
+        let fmt = AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: sampleRate, channels: 1, interleaved: true)!
+        format = fmt
+        engine.attach(playerNode)
+        engine.connect(playerNode, to: engine.mainMixerNode, format: fmt)
+        do {
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playAndRecord, mode: .voiceChat, options: [.allowBluetooth, .defaultToSpeaker])
+            try session.setActive(true)
+            try session.overrideOutputAudioPort(.speaker)
+            try engine.start()
+            playerNode.play()
+            started = true
+        } catch {
+            print("NativePcmPlayer prepare: \(error.localizedDescription)")
+        }
+    }
+
+    func enqueue(base64: String, sampleRate: Double = 16000) {
+        if !started { prepare(sampleRate: sampleRate) }
+        guard started, let fmt = format, let data = Data(base64Encoded: base64), data.count >= 2 else { return }
+        let frameCount = AVAudioFrameCount(data.count / 2)
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: fmt, frameCapacity: frameCount) else { return }
+        buffer.frameLength = frameCount
+        data.withUnsafeBytes { raw in
+            guard let src = raw.baseAddress, let dst = buffer.int16ChannelData?[0] else { return }
+            memcpy(dst, src, data.count)
+        }
+        playerNode.scheduleBuffer(buffer, completionHandler: nil)
+    }
+
+    func stop() {
+        playerNode.stop()
+        engine.stop()
+        started = false
+        format = nil
+    }
+}
+
 final class WebContainerViewController: UIViewController, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler {
     static let sharedProcessPool = WKProcessPool()
 
@@ -229,6 +276,20 @@ final class WebContainerViewController: UIViewController, WKNavigationDelegate, 
                 } catch {
                     print("Candy Call audio session: \(error.localizedDescription)")
                 }
+            }
+        case "pcm_start":
+            DispatchQueue.main.async {
+                NativePcmPlayer.shared.prepare(sampleRate: 16000)
+            }
+        case "play_pcm":
+            let b64 = body["d"] as? String ?? ""
+            let sr = (body["sr"] as? NSNumber)?.doubleValue ?? 16000
+            DispatchQueue.main.async {
+                NativePcmPlayer.shared.enqueue(base64: b64, sampleRate: sr)
+            }
+        case "stop_pcm":
+            DispatchQueue.main.async {
+                NativePcmPlayer.shared.stop()
             }
         default:
             break
