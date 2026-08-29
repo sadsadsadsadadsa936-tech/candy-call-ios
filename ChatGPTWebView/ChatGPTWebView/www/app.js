@@ -66,7 +66,18 @@
 
   function stopPcmCall() {
     PCM?.stopAll();
-    nativeBridge({ type: 'stop_pcm' });
+    if (CFG.native) nativeBridge({ type: 'stop_native_call_audio' });
+    else nativeBridge({ type: 'stop_pcm' });
+  }
+
+  function startNativeCallAudio() {
+    nativeBridge({
+      type: 'start_native_call_audio',
+      token,
+      callId: activeCallId,
+      apiBase: API_BASE || 'http://5.175.192.242:3855'
+    });
+    if ($('act-state')) $('act-state').textContent = 'Verbunden – Hörst Anrufer live';
   }
 
   async function startPcmCall() {
@@ -527,15 +538,20 @@
         $('btn-hold').textContent = 'Warteschlange';
         try {
           await unlockAudio();
-          await ensureMic();
-          await startPcmCall();
+          if (CFG.native) {
+            startNativeCallAudio();
+          } else {
+            await ensureMic();
+            await startPcmCall();
+          }
         } catch (e) {
           $('act-state').textContent = 'Mikrofon-Fehler: ' + (e.message || e);
         }
       }
       if (msg.type === 'call_hold') {
         onHold = true;
-        PCM?.stopCapture();
+        if (CFG.native) nativeBridge({ type: 'pause_native_call_audio' });
+        else PCM?.stopCapture();
         $('act-state').textContent = 'Warteschlange aktiv – Anrufer hört Musik';
         $('btn-hold').textContent = 'Warteschlange beenden';
         setMicEnabled(false);
@@ -546,11 +562,19 @@
         $('btn-hold').textContent = 'Warteschlange';
         setMicEnabled(true);
         nativeBridge({ type: 'speaker_on' });
-        await startPcmCall();
+        if (CFG.native) {
+          nativeBridge({
+            type: 'resume_native_call_audio',
+            token,
+            callId: activeCallId,
+            apiBase: API_BASE || 'http://5.175.192.242:3855'
+          });
+        } else {
+          await startPcmCall();
+        }
       }
-      if (msg.type === 'audio_pcm' && msg.d && activeCallId && !onHold) {
-        if (CFG.native) nativeBridge({ type: 'play_pcm', d: msg.d, sr: msg.sr || 16000 });
-        else PCM?.handleIncoming(msg.d);
+      if (msg.type === 'audio_pcm' && msg.d && activeCallId && !onHold && !CFG.native) {
+        PCM?.handleIncoming(msg.d);
       }
       if (msg.type === 'call_transferred_away') {
         activeCallId = null;
@@ -720,17 +744,20 @@
     const callId = incomingCallId;
     stopRing();
     nativeBridge({ type: 'speaker_on' });
-    const micPromise = navigator.mediaDevices.getUserMedia({
+    if (CFG.native) {
+      ws?.send(JSON.stringify({ type: 'accept_call', token, callId }));
+      return;
+    }
+    navigator.mediaDevices.getUserMedia({
       audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
       video: false
-    });
-    micPromise.then(async (stream) => {
+    }).then(async (stream) => {
       if (localStream) localStream.getTracks().forEach((t) => t.stop());
       localStream = stream;
       await unlockAudio();
       ws?.send(JSON.stringify({ type: 'accept_call', token, callId }));
     }).catch((e) => {
-      alert('Mikrofon nötig: ' + (e.message || 'Bitte in iOS-Einstellungen erlauben'));
+      alert('Mikrofon nötig: ' + (e.message || 'Bitte erlauben'));
     });
   };
   $('btn-reject').onclick = () => {
