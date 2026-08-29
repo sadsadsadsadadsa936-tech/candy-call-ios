@@ -211,6 +211,11 @@ final class WebContainerViewController: UIViewController, WKNavigationDelegate, 
             UNUserNotificationCenter.current().add(req, withCompletionHandler: nil)
         case "stop_ring":
             UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: ["candy-call-ring"])
+        case "speaker_on":
+            let session = AVAudioSession.sharedInstance()
+            try? session.setCategory(.playAndRecord, mode: .voiceChat, options: [.allowBluetooth, .defaultToSpeaker, .mixWithOthers])
+            try? session.setActive(true)
+            try? session.overrideOutputAudioPort(.speaker)
         default:
             break
         }

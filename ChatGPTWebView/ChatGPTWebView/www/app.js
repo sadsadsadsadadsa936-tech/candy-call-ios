@@ -22,6 +22,8 @@
   let ringTimer = null;
   let pendingIce = [];
   let audioUnlocked = false;
+  let remoteAudioCtx = null;
+  let remoteAudioSource = null;
 
   const $ = (id) => document.getElementById(id);
   const remoteAudio = $('remote-audio');
@@ -218,6 +220,10 @@
   }
 
   function cleanupPc(keepMic) {
+    try { remoteAudioSource?.disconnect(); } catch (_) {}
+    remoteAudioSource = null;
+    try { remoteAudioCtx?.close(); } catch (_) {}
+    remoteAudioCtx = null;
     try { pc?.close(); } catch (_) {}
     pc = null;
     pendingIce = [];
@@ -229,13 +235,31 @@
   }
 
   async function attachRemoteStream(stream) {
-    if (!remoteAudio || !stream) return;
-    remoteAudio.srcObject = stream;
-    remoteAudio.muted = false;
-    remoteAudio.volume = 1;
-    try { await remoteAudio.play(); } catch (_) {
-      setTimeout(() => remoteAudio.play().catch(() => {}), 200);
+    if (!stream) return;
+    await unlockAudio();
+    nativeBridge({ type: 'speaker_on' });
+
+    if (remoteAudio) {
+      remoteAudio.srcObject = stream;
+      remoteAudio.muted = false;
+      remoteAudio.volume = 1;
+      try { await remoteAudio.play(); } catch (_) {
+        setTimeout(() => remoteAudio.play().catch(() => {}), 300);
+      }
     }
+
+    // WKWebView/iOS: remote WebRTC audio often needs Web Audio API routing
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      try { remoteAudioSource?.disconnect(); } catch (_) {}
+      if (!remoteAudioCtx || remoteAudioCtx.state === 'closed') {
+        remoteAudioCtx = new Ctx();
+      }
+      if (remoteAudioCtx.state === 'suspended') await remoteAudioCtx.resume();
+      remoteAudioSource = remoteAudioCtx.createMediaStreamSource(stream);
+      remoteAudioSource.connect(remoteAudioCtx.destination);
+    } catch (_) { /* HTML audio fallback above */ }
   }
 
   async function setupPeer(isOfferer) {
@@ -256,6 +280,7 @@
     pc.ontrack = (ev) => {
       const stream = ev.streams[0] || new MediaStream([ev.track]);
       attachRemoteStream(stream);
+      ev.track.onunmute = () => attachRemoteStream(stream);
     };
     pc.onconnectionstatechange = () => {
       if ($('act-state') && activeCallId) {
@@ -296,10 +321,20 @@
 
   async function handleSignal(signal) {
     if (!signal) return;
-    if (!pc) await setupPeer(false);
+
+    if (signal.sdp?.type === 'offer') {
+      if (pc) {
+        try { pc.close(); } catch (_) {}
+        pc = null;
+        pendingIce = [];
+      }
+      await setupPeer(false);
+    } else if (!pc) {
+      await setupPeer(false);
+    }
 
     if (signal.sdp) {
-      const desc = signal.sdp.type ? signal.sdp : signal.sdp;
+      const desc = signal.sdp;
       await pc.setRemoteDescription(new RTCSessionDescription(desc));
       await flushIce();
       if (desc.type === 'offer') {
@@ -392,7 +427,7 @@
         try {
           await unlockAudio();
           await ensureMic();
-          if (!pc) await setupPeer(false);
+          // PeerConnection wird erstellt wenn das Offer vom Anrufer ankommt
         } catch (e) {
           $('act-state').textContent = 'Mikrofon-Fehler: ' + (e.message || e);
         }
@@ -408,6 +443,7 @@
         $('act-state').textContent = 'Verbunden';
         $('btn-hold').textContent = 'Warteschlange';
         setMicEnabled(true);
+        nativeBridge({ type: 'speaker_on' });
         if (remoteAudio?.srcObject) attachRemoteStream(remoteAudio.srcObject);
       }
       if (msg.type === 'call_transferred_away') {
