@@ -6,8 +6,17 @@
     iceServers: [
       { urls: 'stun:stun.l.google.com:19302' },
       { urls: 'stun:stun1.l.google.com:19302' },
-      { urls: 'stun:stun.cloudflare.com:3478' }
-    ]
+      {
+        urls: [
+          'turn:openrelay.metered.ca:80',
+          'turn:openrelay.metered.ca:443',
+          'turn:openrelay.metered.ca:443?transport=tcp'
+        ],
+        username: 'openrelayproject',
+        credential: 'openrelayproject'
+      }
+    ],
+    iceCandidatePoolSize: 10
   };
 
   let token = localStorage.getItem(TOKEN_KEY) || '';
@@ -22,15 +31,18 @@
   let ringTimer = null;
   let pendingIce = [];
   let audioUnlocked = false;
-  let remoteAudioCtx = null;
-  let remoteAudioSource = null;
+  let receiverWatchTimer = null;
+  let attachedRemoteTrackId = null;
 
   const $ = (id) => document.getElementById(id);
   const remoteAudio = $('remote-audio');
-  if (remoteAudio) {
-    remoteAudio.autoplay = true;
-    remoteAudio.setAttribute('playsinline', 'true');
-    remoteAudio.setAttribute('webkit-playsinline', 'true');
+  const remoteVideo = $('remote-video');
+  for (const el of [remoteAudio, remoteVideo]) {
+    if (!el) continue;
+    el.autoplay = true;
+    el.setAttribute('playsinline', 'true');
+    el.setAttribute('webkit-playsinline', 'true');
+    el.muted = false;
   }
 
   let ringCtx = null;
@@ -219,11 +231,70 @@
     }
   }
 
+  function stopReceiverWatch() {
+    if (receiverWatchTimer) {
+      clearInterval(receiverWatchTimer);
+      receiverWatchTimer = null;
+    }
+  }
+
+  function updateAudioStatus() {
+    if (!$('act-state') || !activeCallId || !pc) return;
+    const tracks = pc.getReceivers()
+      .map((r) => r.track)
+      .filter((t) => t && t.kind === 'audio');
+    const live = tracks.filter((t) => t.readyState === 'live');
+    const st = pc.connectionState || '';
+    if (onHold) {
+      $('act-state').textContent = 'Warteschlange aktiv – Anrufer hört Musik';
+    } else if (live.length) {
+      $('act-state').textContent = 'Verbunden – Anrufer hörbar';
+    } else if (st === 'connected') {
+      $('act-state').textContent = 'Verbunden – warte auf Audio…';
+    } else if (st === 'failed') {
+      $('act-state').textContent = 'Audio-Verbindung fehlgeschlagen';
+    } else if (st === 'connecting') {
+      $('act-state').textContent = 'Verbinde Audio…';
+    }
+  }
+
+  function findRemoteAudioStream() {
+    if (!pc) return null;
+    for (const r of pc.getReceivers()) {
+      if (r.track && r.track.kind === 'audio' && r.track.readyState === 'live') {
+        return new MediaStream([r.track]);
+      }
+    }
+    for (const t of pc.getTransceivers()) {
+      const track = t.receiver?.track;
+      if (track && track.kind === 'audio' && track.readyState === 'live') {
+        return new MediaStream([track]);
+      }
+    }
+    return null;
+  }
+
+  function startReceiverWatch() {
+    stopReceiverWatch();
+    if (!pc) return;
+    let tries = 0;
+    const tick = () => {
+      if (!pc || pc.connectionState === 'closed') {
+        stopReceiverWatch();
+        return;
+      }
+      const stream = findRemoteAudioStream();
+      if (stream) attachRemoteStream(stream);
+      updateAudioStatus();
+      if (++tries > 90) stopReceiverWatch();
+    };
+    tick();
+    receiverWatchTimer = setInterval(tick, 500);
+  }
+
   function cleanupPc(keepMic) {
-    try { remoteAudioSource?.disconnect(); } catch (_) {}
-    remoteAudioSource = null;
-    try { remoteAudioCtx?.close(); } catch (_) {}
-    remoteAudioCtx = null;
+    stopReceiverWatch();
+    attachedRemoteTrackId = null;
     try { pc?.close(); } catch (_) {}
     pc = null;
     pendingIce = [];
@@ -232,34 +303,39 @@
       localStream = null;
     }
     if (remoteAudio) remoteAudio.srcObject = null;
+    if (remoteVideo) remoteVideo.srcObject = null;
+  }
+
+  async function playRemoteMedia(stream) {
+    // iOS WKWebView: WebRTC-Audio zuverlässiger über <video> als <audio>
+    const targets = [remoteVideo, remoteAudio].filter(Boolean);
+    for (const el of targets) {
+      el.srcObject = stream;
+      el.muted = false;
+      el.volume = 1;
+      try { await el.play(); } catch (_) {
+        setTimeout(() => el.play().catch(() => {}), 250);
+      }
+    }
   }
 
   async function attachRemoteStream(stream) {
     if (!stream) return;
+    const track = stream.getAudioTracks()[0];
+    if (!track) return;
+    if (attachedRemoteTrackId === track.id && track.readyState === 'live') {
+      await playRemoteMedia(stream);
+      return;
+    }
+    attachedRemoteTrackId = track.id;
+    track.enabled = true;
+    track.onunmute = () => playRemoteMedia(stream);
+    track.onended = () => { attachedRemoteTrackId = null; };
+
     await unlockAudio();
     nativeBridge({ type: 'speaker_on' });
-
-    if (remoteAudio) {
-      remoteAudio.srcObject = stream;
-      remoteAudio.muted = false;
-      remoteAudio.volume = 1;
-      try { await remoteAudio.play(); } catch (_) {
-        setTimeout(() => remoteAudio.play().catch(() => {}), 300);
-      }
-    }
-
-    // WKWebView/iOS: remote WebRTC audio often needs Web Audio API routing
-    try {
-      const Ctx = window.AudioContext || window.webkitAudioContext;
-      if (!Ctx) return;
-      try { remoteAudioSource?.disconnect(); } catch (_) {}
-      if (!remoteAudioCtx || remoteAudioCtx.state === 'closed') {
-        remoteAudioCtx = new Ctx();
-      }
-      if (remoteAudioCtx.state === 'suspended') await remoteAudioCtx.resume();
-      remoteAudioSource = remoteAudioCtx.createMediaStreamSource(stream);
-      remoteAudioSource.connect(remoteAudioCtx.destination);
-    } catch (_) { /* HTML audio fallback above */ }
+    await playRemoteMedia(stream);
+    updateAudioStatus();
   }
 
   async function setupPeer(isOfferer) {
@@ -283,12 +359,8 @@
       ev.track.onunmute = () => attachRemoteStream(stream);
     };
     pc.onconnectionstatechange = () => {
-      if ($('act-state') && activeCallId) {
-        const st = pc?.connectionState || '';
-        if (st === 'connected') $('act-state').textContent = onHold ? 'Warteschlange aktiv' : 'Verbunden – Audio aktiv';
-        else if (st === 'failed') $('act-state').textContent = 'Verbindung fehlgeschlagen';
-        else if (st === 'connecting') $('act-state').textContent = 'Verbinde Audio…';
-      }
+      updateAudioStatus();
+      if (pc?.connectionState === 'connected') startReceiverWatch();
     };
     pc.onicecandidate = (ev) => {
       if (ev.candidate && ws && activeCallId) {
@@ -345,6 +417,8 @@
           callId: activeCallId,
           signal: { sdp: { type: pc.localDescription.type, sdp: pc.localDescription.sdp } }
         }));
+        nativeBridge({ type: 'speaker_on' });
+        startReceiverWatch();
       }
     } else if (signal.candidate) {
       const cand = signal.candidate;
@@ -444,7 +518,9 @@
         $('btn-hold').textContent = 'Warteschlange';
         setMicEnabled(true);
         nativeBridge({ type: 'speaker_on' });
-        if (remoteAudio?.srcObject) attachRemoteStream(remoteAudio.srcObject);
+        const resumeStream = remoteVideo?.srcObject || remoteAudio?.srcObject || findRemoteAudioStream();
+        if (resumeStream) attachRemoteStream(resumeStream);
+        else startReceiverWatch();
       }
       if (msg.type === 'call_transferred_away') {
         activeCallId = null;
@@ -617,6 +693,7 @@
       alert('Mikrofon-Zugriff nötig: ' + (e.message || e));
       return;
     }
+    nativeBridge({ type: 'speaker_on' });
     stopRing();
     ws?.send(JSON.stringify({ type: 'accept_call', token, callId: incomingCallId }));
   };

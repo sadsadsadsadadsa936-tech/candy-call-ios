@@ -97,11 +97,11 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.2.1
-          name: Candy Call 1.2.1
+          tag_name: v1.2.2
+          name: Candy Call 1.2.2
           body: |
-            Fixes one-way audio on iPhone (agent could not hear caller).
-            Web Audio routing + speaker output + signal buffering.
+            Fixes iPhone audio: video element playback, TURN relay, receiver polling, audio session fix.
+            Install this IPA over the old app with Sideloadly.
           files: ${{ runner.temp }}/out/CandyCall.ipa
           fail_on_unmatched_files: true
         env:

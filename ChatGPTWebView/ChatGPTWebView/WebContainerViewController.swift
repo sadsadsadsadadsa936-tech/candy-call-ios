@@ -47,6 +47,11 @@ final class WebContainerViewController: UIViewController, WKNavigationDelegate, 
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .systemBackground
+        if service.usesLocalBundle {
+            let session = AVAudioSession.sharedInstance()
+            try? session.setCategory(.playAndRecord, mode: .voiceChat, options: [.allowBluetooth, .defaultToSpeaker])
+            try? session.setActive(true)
+        }
         configureActivityIndicator()
         configureNavigationItems()
         recreateWebViewIfNeeded()
@@ -149,6 +154,9 @@ final class WebContainerViewController: UIViewController, WKNavigationDelegate, 
         if #available(iOS 14.0, *) {
             config.defaultWebpagePreferences.allowsContentJavaScript = true
         }
+        if #available(iOS 17.0, *) {
+            config.mediaTypesRequiringUserActionForPlayback = []
+        }
 
         let prefs = WKWebpagePreferences()
         prefs.allowsContentJavaScript = true
@@ -212,10 +220,16 @@ final class WebContainerViewController: UIViewController, WKNavigationDelegate, 
         case "stop_ring":
             UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: ["candy-call-ring"])
         case "speaker_on":
-            let session = AVAudioSession.sharedInstance()
-            try? session.setCategory(.playAndRecord, mode: .voiceChat, options: [.allowBluetooth, .defaultToSpeaker, .mixWithOthers])
-            try? session.setActive(true)
-            try? session.overrideOutputAudioPort(.speaker)
+            DispatchQueue.main.async {
+                let session = AVAudioSession.sharedInstance()
+                do {
+                    try session.setCategory(.playAndRecord, mode: .voiceChat, options: [.allowBluetooth, .defaultToSpeaker])
+                    try session.setActive(true)
+                    try session.overrideOutputAudioPort(.speaker)
+                } catch {
+                    print("Candy Call audio session: \(error.localizedDescription)")
+                }
+            }
         default:
             break
         }
